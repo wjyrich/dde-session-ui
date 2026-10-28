@@ -9,6 +9,7 @@
 #include <QVBoxLayout>
 #include <QApplication>
 #include <QIcon>
+#include <QCloseEvent>
 
 #include <DFontSizeManager>
 DTK_USE_NAMESPACE
@@ -21,13 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_content(new Content)
     , m_handle(new DPlatformWindowHandle(this))
 {
-    auto envType = qEnvironmentVariable("XDG_SESSION_TYPE");
-    bool bWayland = envType.contains("wayland");
-    if (bWayland) {
-        setWindowFlags(windowFlags() | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
-    } else {
-        setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint | Qt::Tool);
-    }
+    setWindowFlags(Qt::Dialog | Qt::WindowCloseButtonHint);
 
     setAccessibleName("MainWindow");
 
@@ -50,7 +45,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     btnclose = new DIconButton(QStyle::SP_TitleBarCloseButton, this);
     btnclose->setAccessibleName("CloseBtn");
-    btnclose->setVisible(false);
+    btnclose->setVisible(true);
     btnclose->setFlat(true);
     btnclose->setIconSize(QSize(40, 40));
     btnclose->setFocusPolicy(Qt::NoFocus);
@@ -60,7 +55,7 @@ MainWindow::MainWindow(QWidget *parent)
     btnclose->setPalette(pa);
 
     QHBoxLayout *titlelayout = new QHBoxLayout;
-    titlelayout->setContentsMargins(0, 0, 0, 0);
+    titlelayout->setContentsMargins(40, 0, 40, 0);
     titlelayout->addWidget(m_title);
     widget->setLayout(titlelayout);
     //m_title->setAlignment(Qt::AlignCenter);
@@ -70,7 +65,7 @@ MainWindow::MainWindow(QWidget *parent)
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    //layout->addSpacing(10);
+    layout->addSpacing(40);
     layout->addWidget(widget, 0, Qt::AlignHCenter);
     layout->addWidget(m_content);
     m_content->setAccessibleName("MainContent");
@@ -88,12 +83,16 @@ MainWindow::MainWindow(QWidget *parent)
     m_leftIconBtn->setVisible(false);
     m_leftIconBtn->raise();
 
+    connect(btnclose, &DIconButton::clicked, this, &QWidget::close);
+    setTitlebarIcon(QStringLiteral("preferences-system"));
+
     connect(m_content, &Content::sourceChanged, this, [ = ](bool isCn) {
         if (isCn) {
             m_title->setText(m_cnTitle);
         } else {
             m_title->setText(m_enTitle);
         }
+        setWindowTitle(m_title->text());
 
          int newWidth = m_content->calWidgetWidth();
         // 根据计算后的宽度调整主窗口
@@ -117,15 +116,20 @@ void MainWindow::resizeEvent(QResizeEvent *event)
     }
 }
 
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    DBlurEffectWidget::closeEvent(event);
+    // The foreign parent can keep the application alive after this window closes.
+    if (event->isAccepted())
+        qApp->exit(0);
+}
+
 void MainWindow::setTitlebarIcon(const QString &iconName)
 {
     if (!iconName.isEmpty()) {
         m_leftIconBtn->setIcon(QIcon::fromTheme(iconName));
         m_leftIconBtn->setVisible(true);
         btnclose->setVisible(true);
-        connect(btnclose, &DIconButton::clicked, this, [ = ] {
-            qApp->exit(-1);
-        });
     }
 }
 
@@ -176,9 +180,6 @@ void MainWindow::setHideBottom(const QString& param)
     {
         status = true;
         btnclose->setVisible(true);
-        connect(btnclose, &DIconButton::clicked, this, [ = ] {
-            qApp->exit(0);
-        });
     }
     m_content->setHideBottom(status);
 }
